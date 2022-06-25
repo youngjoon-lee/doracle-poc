@@ -10,9 +10,9 @@ import (
 	"net/http"
 
 	"github.com/btcsuite/btcd/btcec"
-	"github.com/medibloc/doracle-poc/pkg/secp256k1"
-	"github.com/medibloc/doracle-poc/pkg/server"
-	"github.com/medibloc/doracle-poc/pkg/sgx"
+	"github.com/youngjoon-lee/doracle-poc/pkg/secp256k1"
+	"github.com/youngjoon-lee/doracle-poc/pkg/server"
+	"github.com/youngjoon-lee/doracle-poc/pkg/sgx"
 )
 
 func CallHandshake(peerAddr string, nodePrivKey *btcec.PrivateKey) (*btcec.PrivateKey, error) {

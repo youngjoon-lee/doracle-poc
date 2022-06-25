@@ -1,9 +1,9 @@
 package mode
 
 import (
-	"github.com/medibloc/doracle-poc/pkg/secp256k1"
-	"github.com/medibloc/doracle-poc/pkg/sgx"
 	log "github.com/sirupsen/logrus"
+	"github.com/youngjoon-lee/doracle-poc/pkg/secp256k1"
+	"github.com/youngjoon-lee/doracle-poc/pkg/sgx"
 )
 
 const OracleKeyFilePath = "/data/oracle-key.sealed"
