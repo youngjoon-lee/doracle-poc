@@ -1,6 +1,6 @@
 # PoC: Decentralized Oracle for sensitive data validation
 
-This is a proof-of-concept of the decentralized oracle for off-chain data validation while preserving privacy.
+This is a proof-of-concept of the decentralized oracle which validates off-chain data while preserving privacy powered by on-chain proof-of-stake and Intel SGX.
 
 
 ## Hardware Requirements
