@@ -2,7 +2,10 @@ package event
 
 import (
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
+	"github.com/youngjoon-lee/doracle-poc/pkg/app"
 )
+
+type HandlerFn func(ctypes.ResultEvent) error
 
 type Event interface {
 	Name() string
@@ -10,8 +13,8 @@ type Event interface {
 	Handler(ctypes.ResultEvent) error
 }
 
-func Events() []Event {
+func Events(app *app.App) []Event {
 	return []Event{
-		joinEvent{},
+		joinEvent{app: app},
 	}
 }

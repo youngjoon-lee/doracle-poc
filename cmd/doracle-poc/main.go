@@ -6,19 +6,23 @@ import (
 	"os/signal"
 	"syscall"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	log "github.com/sirupsen/logrus"
+	dhubapp "github.com/youngjoon-lee/dhub/app"
 	"github.com/youngjoon-lee/doracle-poc/cmd/doracle-poc/mode"
+	"github.com/youngjoon-lee/doracle-poc/pkg/app"
+	"github.com/youngjoon-lee/doracle-poc/pkg/dhub/event"
+	"github.com/youngjoon-lee/doracle-poc/pkg/dhub/tx"
 	"github.com/youngjoon-lee/doracle-poc/pkg/secp256k1"
-	"github.com/youngjoon-lee/doracle-poc/pkg/server"
 	"github.com/youngjoon-lee/doracle-poc/pkg/sgx"
-	"github.com/youngjoon-lee/doracle-poc/pkg/dhub"
 )
 
 func main() {
-	pListenAddr := flag.String("laddr", "0.0.0.0:8080", "http listen addr")
 	pTendermintRPC := flag.String("tm-rpc", "tcp://127.0.0.1:26657", "tendermint rpc addr")
+	pChainID := flag.String("chain-id", "dhub-1", "chain ID")
+	pOperatorMnemonic := flag.String("operator", "", "operator mnemonic")
 	pInit := flag.Bool("init", false, "run doracle with the init mode")
-	pPeer := flag.String("peer", "", "a peer addr for handshaking")
+	pJoin := flag.Bool("join", false, "run doracle with the join mode")
 	pDebug := flag.Bool("debug", false, "enable debug logs")
 	flag.Parse()
 
@@ -26,15 +30,31 @@ func main() {
 		log.SetLevel(log.DebugLevel)
 	}
 
-	if *pInit && *pPeer != "" {
-		log.Fatal("do not use -peer with -init")
+	setDHubConfig()
+
+	operatorPrivKey, operatorAddr, err := secp256k1.PrivateKeyFromMnemonic(*pOperatorMnemonic)
+	if err != nil {
+		log.Fatalf("failed to get private key from mnemonic: %w", err)
+	}
+
+	txExecutor, err := tx.NewExecutor(*pTendermintRPC, *pChainID, operatorAddr, operatorPrivKey)
+	if err != nil {
+		log.Fatalf("failed to init tx executor: %v", err)
+	}
+	subscriber, err := event.NewSubscriber(*pTendermintRPC)
+	if err != nil {
+		log.Fatalf("failed to init subscriber: %v", err)
+	}
+
+	if *pInit && *pJoin {
+		log.Fatal("do not use -init with -join")
 	} else if *pInit {
 		if err := mode.Init(); err != nil {
-			log.Fatal("failed to run the init mode: %v", err)
+			log.Fatalf("failed to run the init mode: %v", err)
 		}
-	} else if *pPeer != "" {
-		if err := mode.Handshake(*pPeer); err != nil {
-			log.Fatal("failed to run the handshake mode: %v", err)
+	} else if *pJoin {
+		if err := mode.Join(txExecutor, subscriber); err != nil {
+			log.Fatalf("failed to run the join mode: %v", err)
 		}
 	}
 
@@ -43,20 +63,35 @@ func main() {
 		log.Fatalf("failed to load and unseal oracle key: %v", err)
 	}
 
-	subscriber, err := dhub.StartSubscriber(*pTendermintRPC)
-	if err != nil {
-		log.Fatalf("failed to init subscriber: %v", err)
-	}
-	defer subscriber.Stop()
+	app := app.NewApp(secp256k1.PrivKeyFromBytes(oraclePrivKeyBytes), txExecutor)
 
-	srv := server.NewServer(secp256k1.PrivKeyFromBytes(oraclePrivKeyBytes))
-	srvShutdownFunc := srv.ListenAndServe(*pListenAddr)
+	if err := subscriber.Start(app); err != nil {
+		log.Fatalf("failed to start subscriber: %v", err)
+	}
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
 	<-sigCh
 
-	srvShutdownFunc()
+	subscriber.Stop()
 
 	log.Info("terminating the process")
+}
+
+func setDHubConfig() {
+	accountAddressPrefix := dhubapp.AccountAddressPrefix
+
+	// Set prefixes
+	accountPubKeyPrefix := accountAddressPrefix + "pub"
+	validatorAddressPrefix := accountAddressPrefix + "valoper"
+	validatorPubKeyPrefix := accountAddressPrefix + "valoperpub"
+	consNodeAddressPrefix := accountAddressPrefix + "valcons"
+	consNodePubKeyPrefix := accountAddressPrefix + "valconspub"
+
+	// Set and seal config
+	config := sdk.GetConfig()
+	config.SetBech32PrefixForAccount(accountAddressPrefix, accountPubKeyPrefix)
+	config.SetBech32PrefixForValidator(validatorAddressPrefix, validatorPubKeyPrefix)
+	config.SetBech32PrefixForConsensusNode(consNodeAddressPrefix, consNodePubKeyPrefix)
+	config.Seal()
 }
