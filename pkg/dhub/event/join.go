@@ -6,27 +6,36 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/btcsuite/btcd/btcec"
 	log "github.com/sirupsen/logrus"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	oracletypes "github.com/youngjoon-lee/dhub/x/oracle/types"
-	"github.com/youngjoon-lee/doracle-poc/pkg/app"
+	"github.com/youngjoon-lee/doracle-poc/pkg/dhub/tx"
 	"github.com/youngjoon-lee/doracle-poc/pkg/secp256k1"
 	"github.com/youngjoon-lee/doracle-poc/pkg/sgx"
 )
 
-type joinEvent struct {
-	app *app.App
+type JoinEvent struct {
+	oraclePrivKey *btcec.PrivateKey
+	txExecutor    tx.Executor
 }
 
-func (e joinEvent) Name() string {
+func NewJoinEvent(oraclePrivKey *btcec.PrivateKey, txExecutor tx.Executor) JoinEvent {
+	return JoinEvent{
+		oraclePrivKey: oraclePrivKey,
+		txExecutor:    txExecutor,
+	}
+}
+
+func (e JoinEvent) Name() string {
 	return "join"
 }
 
-func (e joinEvent) Query() string {
+func (e JoinEvent) Query() string {
 	return "tm.event='Tx' AND message.module='oracle' AND message.action='join'"
 }
 
-func (e joinEvent) Handler(event ctypes.ResultEvent) error {
+func (e JoinEvent) Handler(event ctypes.ResultEvent) error {
 	log.Debugf("JOIN EVENT: %v", event)
 
 	joinID, err := strconv.ParseUint(event.Events["join.id"][0], 10, 64)
@@ -59,14 +68,14 @@ func (e joinEvent) Handler(event ctypes.ResultEvent) error {
 
 	yesValue := ""
 	if voteOption == oracletypes.OptionYes {
-		encryptedOraclePrivKey, err := secp256k1.Encrypt(encPubkey, e.app.OraclePrivKey().Serialize())
+		encryptedOraclePrivKey, err := secp256k1.Encrypt(encPubkey, e.oraclePrivKey.Serialize())
 		if err != nil {
 			return fmt.Errorf("failed to encrypt oracle priv key: %w", err)
 		}
 		yesValue = base64.StdEncoding.EncodeToString(encryptedOraclePrivKey)
 	}
 
-	if err := e.app.TxExecutor().VoteForJoin(joinID, voteOption, yesValue); err != nil {
+	if err := e.txExecutor.VoteForJoin(joinID, voteOption, yesValue); err != nil {
 		return fmt.Errorf("failed to vote for join: %w", err)
 	}
 

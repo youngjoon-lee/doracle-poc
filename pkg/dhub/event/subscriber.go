@@ -6,7 +6,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	rpchttp "github.com/tendermint/tendermint/rpc/client/http"
-	"github.com/youngjoon-lee/doracle-poc/pkg/app"
 )
 
 type Subscriber struct {
@@ -34,17 +33,8 @@ func (s *Subscriber) Stop() {
 	s.client.Stop()
 }
 
-func (s *Subscriber) SubscribeAll(app *app.App) error {
-	for _, e := range Events(app) {
-		if err := s.subscribe(e.Name(), e.Query(), e.Handler); err != nil {
-			return fmt.Errorf("failed to subsribe: %v", e.Name())
-		}
-	}
-	return nil
-}
-
-func (s *Subscriber) subscribe(subscriber, query string, handler HandlerFn) error {
-	resEventCh, err := s.client.Subscribe(context.Background(), subscriber, query)
+func (s *Subscriber) Subscribe(ev Event) error {
+	resEventCh, err := s.client.Subscribe(context.Background(), ev.Name(), ev.Query())
 	if err != nil {
 		return fmt.Errorf("failed to subscribe: %w", err)
 	}
@@ -53,13 +43,13 @@ func (s *Subscriber) subscribe(subscriber, query string, handler HandlerFn) erro
 		for resEvent := range resEventCh {
 			log.Debugf("event detected: %v", resEvent)
 
-			if err := handler(resEvent); err != nil {
+			if err := ev.Handler(resEvent); err != nil {
 				log.Errorf("failed to handle event: %v", err)
 			}
 		}
 	}()
 
-	log.Infof("subscription registered: %v / %v", subscriber, query)
+	log.Infof("subscription registered: %v / %v", ev.Name(), ev.Query())
 	return nil
 }
 

@@ -8,7 +8,7 @@ import (
 )
 
 func (e Executor) VoteForJoin(joinID uint64, option oracletypes.VoteOption, yesValue string) error {
-	msg := oracletypes.NewMsgVoteForJoin(joinID, option, yesValue, e.FromAddr.String())
+	msg := oracletypes.NewMsgVoteForJoin(joinID, option, yesValue, e.Signer().String())
 
 	res, err := e.signAndBroadcastTx(msg)
 	if err != nil {

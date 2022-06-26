@@ -13,11 +13,22 @@
 			"type": "hostfs",
 			"readOnly": false
 		},
+   {
+			"source": "/home/ubuntu",
+			"target": "/hosthome",
+			"type": "hostfs",
+			"readOnly": false
+		},
 		{
 			"target": "/tmp",
 			"type": "memfs"
 		}
 	],
- "env": null,
+ "env": [
+   {
+     "name": "HOME",
+     "value": "/hosthome"
+   }
+ ],
  "files": null
 }

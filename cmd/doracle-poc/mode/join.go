@@ -7,13 +7,13 @@ import (
 
 	cosmossecp256k1 "github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	log "github.com/sirupsen/logrus"
+	"github.com/youngjoon-lee/doracle-poc/pkg/app"
 	"github.com/youngjoon-lee/doracle-poc/pkg/dhub/event"
-	"github.com/youngjoon-lee/doracle-poc/pkg/dhub/tx"
 	"github.com/youngjoon-lee/doracle-poc/pkg/secp256k1"
 	"github.com/youngjoon-lee/doracle-poc/pkg/sgx"
 )
 
-func Join(txExecutor tx.Executor, subscriber *event.Subscriber) error {
+func Join(app *app.App) error {
 	encPrivKey, err := secp256k1.NewPrivKey()
 	if err != nil {
 		return fmt.Errorf("failed to generate encryption key: %w", err)
@@ -30,14 +30,15 @@ func Join(txExecutor tx.Executor, subscriber *event.Subscriber) error {
 	}
 
 	log.Info("SGX report generated. executing tx...")
-	joinID, err := txExecutor.Join(txExecutor.FromAddr.String(), enclaveReport, pubKey)
+	txExecutor := app.TxExecutor()
+	joinID, err := txExecutor.Join(txExecutor.Signer().String(), enclaveReport, pubKey)
 	if err != nil {
 		return fmt.Errorf("failed to execute join tx: %w", err)
 	}
 
 	log.Info("subscribing the join result...")
 	ev := event.NewJoinResultEvent(joinID, encPrivKey, OracleKeyFilePath)
-	if err := subscriber.SubscribeOnce(context.Background(), ev); err != nil {
+	if err := app.Subscriber().SubscribeOnce(context.Background(), ev); err != nil {
 		return fmt.Errorf("failed to subscribe once: %w", err)
 	}
 

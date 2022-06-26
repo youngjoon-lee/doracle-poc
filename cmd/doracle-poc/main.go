@@ -6,13 +6,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	log "github.com/sirupsen/logrus"
-	dhubapp "github.com/youngjoon-lee/dhub/app"
 	"github.com/youngjoon-lee/doracle-poc/cmd/doracle-poc/mode"
 	"github.com/youngjoon-lee/doracle-poc/pkg/app"
-	"github.com/youngjoon-lee/doracle-poc/pkg/dhub/event"
-	"github.com/youngjoon-lee/doracle-poc/pkg/dhub/tx"
 	"github.com/youngjoon-lee/doracle-poc/pkg/secp256k1"
 	"github.com/youngjoon-lee/doracle-poc/pkg/sgx"
 )
@@ -30,26 +26,11 @@ func main() {
 		log.SetLevel(log.DebugLevel)
 	}
 
-	setDHubConfig()
-
-	operatorPrivKey, operatorAddr, err := secp256k1.PrivateKeyFromMnemonic(*pOperatorMnemonic)
+	app, err := app.NewApp(*pTendermintRPC, *pChainID, *pOperatorMnemonic)
 	if err != nil {
-		log.Fatalf("failed to get private key from mnemonic: %w", err)
+		log.Fatalf("failed to init app: %v", err)
 	}
-
-	txExecutor, err := tx.NewExecutor(*pTendermintRPC, *pChainID, operatorAddr, operatorPrivKey)
-	if err != nil {
-		log.Fatalf("failed to init tx executor: %v", err)
-	}
-
-	subscriber, err := event.NewSubscriber(*pTendermintRPC)
-	if err != nil {
-		log.Fatalf("failed to init subscriber: %v", err)
-	}
-	if err := subscriber.Start(); err != nil {
-		log.Fatalf("failed to start subscriber: %v", err)
-	}
-	defer subscriber.Stop()
+	defer app.Close()
 
 	if *pInit && *pJoin {
 		log.Fatal("do not use -init with -join")
@@ -58,7 +39,7 @@ func main() {
 			log.Fatalf("failed to run the init mode: %v", err)
 		}
 	} else if *pJoin {
-		if err := mode.Join(txExecutor, subscriber); err != nil {
+		if err := mode.Join(app); err != nil {
 			log.Fatalf("failed to run the join mode: %v", err)
 		}
 	}
@@ -68,9 +49,8 @@ func main() {
 		log.Fatalf("failed to load and unseal oracle key: %v", err)
 	}
 
-	app := app.NewApp(secp256k1.PrivKeyFromBytes(oraclePrivKeyBytes), txExecutor)
-
-	if err := subscriber.SubscribeAll(app); err != nil {
+	app.SetOraclePrivKey(secp256k1.PrivKeyFromBytes(oraclePrivKeyBytes))
+	if err := app.SubscribeAll(); err != nil {
 		log.Fatalf("failed to subscribeAll: %v", err)
 	}
 
@@ -79,22 +59,4 @@ func main() {
 	<-sigCh
 
 	log.Info("terminating the process")
-}
-
-func setDHubConfig() {
-	accountAddressPrefix := dhubapp.AccountAddressPrefix
-
-	// Set prefixes
-	accountPubKeyPrefix := accountAddressPrefix + "pub"
-	validatorAddressPrefix := accountAddressPrefix + "valoper"
-	validatorPubKeyPrefix := accountAddressPrefix + "valoperpub"
-	consNodeAddressPrefix := accountAddressPrefix + "valcons"
-	consNodePubKeyPrefix := accountAddressPrefix + "valconspub"
-
-	// Set and seal config
-	config := sdk.GetConfig()
-	config.SetBech32PrefixForAccount(accountAddressPrefix, accountPubKeyPrefix)
-	config.SetBech32PrefixForValidator(validatorAddressPrefix, validatorPubKeyPrefix)
-	config.SetBech32PrefixForConsensusNode(consNodeAddressPrefix, consNodePubKeyPrefix)
-	config.Seal()
 }

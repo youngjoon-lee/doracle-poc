@@ -18,41 +18,45 @@ import (
 
 const (
 	gasLimit = 500000
+	denom    = "uhub"
 )
 
 type Executor struct {
-	RpcClient      rpcclient.Client
-	ChainID        string
+	rpcClient      rpcclient.Client
+	chainID        string
 	encodingConfig cosmoscmd.EncodingConfig
-
-	FromAddr sdk.AccAddress
-	PrivKey  cryptotypes.PrivKey
+	signer         sdk.AccAddress
+	signerPrivKey  cryptotypes.PrivKey
 }
 
-func NewExecutor(rpcAddr, chainID string, fromAddr sdk.AccAddress, privKey cryptotypes.PrivKey) (Executor, error) {
+func NewExecutor(rpcAddr, chainID string, signer sdk.AccAddress, signerPrivKey cryptotypes.PrivKey) (Executor, error) {
 	rpcClient, err := client.NewClientFromNode(rpcAddr)
 	if err != nil {
 		return Executor{}, fmt.Errorf("failed to NewClientFromNode: %w", err)
 	}
 
 	return Executor{
-		RpcClient:      rpcClient,
-		ChainID:        chainID,
+		rpcClient:      rpcClient,
+		chainID:        chainID,
 		encodingConfig: cosmoscmd.MakeEncodingConfig(app.ModuleBasics),
-		FromAddr:       fromAddr,
-		PrivKey:        privKey,
+		signer:         signer,
+		signerPrivKey:  signerPrivKey,
 	}, nil
 }
 
 func (e Executor) Context() client.Context {
 	return client.Context{}.
-		WithClient(e.RpcClient).
-		WithChainID(e.ChainID).
+		WithClient(e.rpcClient).
+		WithChainID(e.chainID).
 		WithCodec(e.encodingConfig.Marshaler).
 		WithInterfaceRegistry(e.encodingConfig.InterfaceRegistry).
 		WithTxConfig(e.encodingConfig.TxConfig).
 		WithLegacyAmino(e.encodingConfig.Amino).
 		WithBroadcastMode("block")
+}
+
+func (e Executor) Signer() sdk.AccAddress {
+	return e.signer
 }
 
 func (e Executor) signAndBroadcastTx(msgs ...sdk.Msg) (*sdk.TxResponse, error) {
@@ -64,23 +68,20 @@ func (e Executor) signAndBroadcastTx(msgs ...sdk.Msg) (*sdk.TxResponse, error) {
 	}
 
 	//TODO: set fee
-	txBuilder.SetFeeAmount(sdk.NewCoins(sdk.NewCoin("dhub", sdk.ZeroInt())))
+	txBuilder.SetFeeAmount(sdk.NewCoins(sdk.NewCoin(denom, sdk.ZeroInt())))
 	txBuilder.SetGasLimit(gasLimit)
 
-	log.Debugf("retrieving account: %v", e.FromAddr.String())
-	accountRetriever := authtypes.AccountRetriever{}
-	accNum, accSeq, err := accountRetriever.GetAccountNumberSequence(clientCtx, e.FromAddr)
+	log.Debugf("retrieving account: %v", e.signer.String())
+	accNum, accSeq, err := authtypes.AccountRetriever{}.GetAccountNumberSequence(clientCtx, e.signer)
 	if err != nil {
-		log.Error(err)
 		return nil, fmt.Errorf("failed to get account number/sequence: %w", err)
 	}
 	log.Debugf("accNum:%v, accSeq:%v", accNum, accSeq)
 
-	// First round: we gather all the signer infos. We use the "set empty
-	// signature" hack to do that.
+	// First round: gather all the signer infos by using the "set empty signature" hack to do that.
 	var sigsV2 []signing.SignatureV2
 	sigV2 := signing.SignatureV2{
-		PubKey: e.PrivKey.PubKey(),
+		PubKey: e.signerPrivKey.PubKey(),
 		Data: &signing.SingleSignatureData{
 			SignMode:  clientCtx.TxConfig.SignModeHandler().DefaultMode(),
 			Signature: nil,
@@ -90,30 +91,30 @@ func (e Executor) signAndBroadcastTx(msgs ...sdk.Msg) (*sdk.TxResponse, error) {
 	sigsV2 = append(sigsV2, sigV2)
 
 	if err := txBuilder.SetSignatures(sigsV2...); err != nil {
-		return nil, fmt.Errorf("failed to set signatures: %w", err)
+		return nil, fmt.Errorf("failed to set signatures (1st): %w", err)
 	}
 
 	// Second round: all signer infos are set, so each signer can sign.
 	sigsV2 = []signing.SignatureV2{}
 	signerData := authsigning.SignerData{
-		ChainID:       e.ChainID,
+		ChainID:       e.chainID,
 		AccountNumber: accNum,
 		Sequence:      accSeq,
 	}
 	sigV2, err = tx.SignWithPrivKey(
 		clientCtx.TxConfig.SignModeHandler().DefaultMode(), signerData,
-		txBuilder, e.PrivKey, clientCtx.TxConfig, accSeq)
+		txBuilder, e.signerPrivKey, clientCtx.TxConfig, accSeq,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign with privkey: %w", err)
 	}
 	sigsV2 = append(sigsV2, sigV2)
 
-	err = txBuilder.SetSignatures(sigsV2...)
-	if err != nil {
+	if err := txBuilder.SetSignatures(sigsV2...); err != nil {
 		return nil, fmt.Errorf("failed to set signatures (2nd): %w", err)
 	}
 
-	// Generated Protobuf-encoded bytes.
+	// generated protobuf-encoded bytes
 	txBytes, err := clientCtx.TxConfig.TxEncoder()(txBuilder.GetTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode tx: %w", err)
