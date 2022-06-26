@@ -16,6 +16,10 @@ import (
 	"github.com/youngjoon-lee/dhub/app"
 )
 
+const (
+	gasLimit = 500000
+)
+
 type Executor struct {
 	RpcClient      rpcclient.Client
 	ChainID        string
@@ -61,7 +65,7 @@ func (e Executor) signAndBroadcastTx(msgs ...sdk.Msg) (*sdk.TxResponse, error) {
 
 	//TODO: set fee
 	txBuilder.SetFeeAmount(sdk.NewCoins(sdk.NewCoin("dhub", sdk.ZeroInt())))
-	txBuilder.SetGasLimit(200000)
+	txBuilder.SetGasLimit(gasLimit)
 
 	log.Debugf("retrieving account: %v", e.FromAddr.String())
 	accountRetriever := authtypes.AccountRetriever{}
