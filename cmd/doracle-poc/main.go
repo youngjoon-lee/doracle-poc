@@ -41,10 +41,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to init tx executor: %v", err)
 	}
+
 	subscriber, err := event.NewSubscriber(*pTendermintRPC)
 	if err != nil {
 		log.Fatalf("failed to init subscriber: %v", err)
 	}
+	if err := subscriber.Start(); err != nil {
+		log.Fatalf("failed to start subscriber: %v", err)
+	}
+	defer subscriber.Stop()
 
 	if *pInit && *pJoin {
 		log.Fatal("do not use -init with -join")
@@ -65,15 +70,13 @@ func main() {
 
 	app := app.NewApp(secp256k1.PrivKeyFromBytes(oraclePrivKeyBytes), txExecutor)
 
-	if err := subscriber.Start(app); err != nil {
-		log.Fatalf("failed to start subscriber: %v", err)
+	if err := subscriber.SubscribeAll(app); err != nil {
+		log.Fatalf("failed to subscribeAll: %v", err)
 	}
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
 	<-sigCh
-
-	subscriber.Stop()
 
 	log.Info("terminating the process")
 }

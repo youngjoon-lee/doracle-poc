@@ -14,7 +14,7 @@ import (
 	"github.com/youngjoon-lee/doracle-poc/pkg/sgx"
 )
 
-type joinEvent struct{
+type joinEvent struct {
 	app *app.App
 }
 

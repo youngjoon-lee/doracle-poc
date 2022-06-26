@@ -24,18 +24,9 @@ func NewSubscriber(rpcAddr string) (*Subscriber, error) {
 	}, nil
 }
 
-func (s *Subscriber) Start(app *app.App) error {
+func (s *Subscriber) Start() error {
 	log.Info("starting subscriber...")
-	if err := s.client.Start(); err != nil {
-		return fmt.Errorf("failed to start subscriber: %w", err)
-	}
-
-	if err := s.subscribeAll(app); err != nil {
-		s.Stop()
-		return fmt.Errorf("failed to register all handlers: %w", err)
-	}
-
-	return nil
+	return s.client.Start()
 }
 
 func (s *Subscriber) Stop() {
@@ -43,7 +34,7 @@ func (s *Subscriber) Stop() {
 	s.client.Stop()
 }
 
-func (s *Subscriber) subscribeAll(app *app.App) error {
+func (s *Subscriber) SubscribeAll(app *app.App) error {
 	for _, e := range Events(app) {
 		if err := s.subscribe(e.Name(), e.Query(), e.Handler); err != nil {
 			return fmt.Errorf("failed to subsribe: %v", e.Name())

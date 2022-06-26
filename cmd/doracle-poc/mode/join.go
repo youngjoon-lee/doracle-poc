@@ -35,7 +35,7 @@ func Join(txExecutor tx.Executor, subscriber *event.Subscriber) error {
 		return fmt.Errorf("failed to execute join tx: %w", err)
 	}
 
-	log.Info("subscribing...")
+	log.Info("subscribing the join result...")
 	ev := event.NewJoinResultEvent(joinID, encPrivKey, OracleKeyFilePath)
 	if err := subscriber.SubscribeOnce(context.Background(), ev); err != nil {
 		return fmt.Errorf("failed to subscribe once: %w", err)

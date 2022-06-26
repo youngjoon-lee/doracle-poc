@@ -17,10 +17,12 @@ import (
 )
 
 type Executor struct {
-	RpcClient rpcclient.Client
-	ChainID   string
-	FromAddr  sdk.AccAddress
-	PrivKey   cryptotypes.PrivKey
+	RpcClient      rpcclient.Client
+	ChainID        string
+	encodingConfig cosmoscmd.EncodingConfig
+
+	FromAddr sdk.AccAddress
+	PrivKey  cryptotypes.PrivKey
 }
 
 func NewExecutor(rpcAddr, chainID string, fromAddr sdk.AccAddress, privKey cryptotypes.PrivKey) (Executor, error) {
@@ -30,29 +32,36 @@ func NewExecutor(rpcAddr, chainID string, fromAddr sdk.AccAddress, privKey crypt
 	}
 
 	return Executor{
-		RpcClient: rpcClient,
-		ChainID:   chainID,
-		FromAddr:  fromAddr,
-		PrivKey:   privKey,
+		RpcClient:      rpcClient,
+		ChainID:        chainID,
+		encodingConfig: cosmoscmd.MakeEncodingConfig(app.ModuleBasics),
+		FromAddr:       fromAddr,
+		PrivKey:        privKey,
 	}, nil
 }
 
 func (e Executor) Context() client.Context {
-	return client.Context{}.WithClient(e.RpcClient).WithChainID(e.ChainID)
+	return client.Context{}.
+		WithClient(e.RpcClient).
+		WithChainID(e.ChainID).
+		WithCodec(e.encodingConfig.Marshaler).
+		WithInterfaceRegistry(e.encodingConfig.InterfaceRegistry).
+		WithTxConfig(e.encodingConfig.TxConfig).
+		WithLegacyAmino(e.encodingConfig.Amino).
+		WithBroadcastMode("block")
 }
 
 func (e Executor) signAndBroadcastTx(msgs ...sdk.Msg) (*sdk.TxResponse, error) {
 	clientCtx := e.Context()
 
-	encCfg := cosmoscmd.MakeEncodingConfig(app.ModuleBasics)
-	txBuilder := encCfg.TxConfig.NewTxBuilder()
-
+	txBuilder := e.encodingConfig.TxConfig.NewTxBuilder()
 	if err := txBuilder.SetMsgs(msgs...); err != nil {
 		return nil, fmt.Errorf("failed to set msgs: %w", err)
 	}
 
 	//TODO: set fee
 	txBuilder.SetFeeAmount(sdk.NewCoins(sdk.NewCoin("dhub", sdk.ZeroInt())))
+	txBuilder.SetGasLimit(200000)
 
 	log.Debugf("retrieving account: %v", e.FromAddr.String())
 	accountRetriever := authtypes.AccountRetriever{}
@@ -69,7 +78,7 @@ func (e Executor) signAndBroadcastTx(msgs ...sdk.Msg) (*sdk.TxResponse, error) {
 	sigV2 := signing.SignatureV2{
 		PubKey: e.PrivKey.PubKey(),
 		Data: &signing.SingleSignatureData{
-			SignMode:  encCfg.TxConfig.SignModeHandler().DefaultMode(),
+			SignMode:  clientCtx.TxConfig.SignModeHandler().DefaultMode(),
 			Signature: nil,
 		},
 		Sequence: accSeq,
@@ -88,8 +97,8 @@ func (e Executor) signAndBroadcastTx(msgs ...sdk.Msg) (*sdk.TxResponse, error) {
 		Sequence:      accSeq,
 	}
 	sigV2, err = tx.SignWithPrivKey(
-		encCfg.TxConfig.SignModeHandler().DefaultMode(), signerData,
-		txBuilder, e.PrivKey, encCfg.TxConfig, accSeq)
+		clientCtx.TxConfig.SignModeHandler().DefaultMode(), signerData,
+		txBuilder, e.PrivKey, clientCtx.TxConfig, accSeq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign with privkey: %w", err)
 	}
@@ -101,7 +110,7 @@ func (e Executor) signAndBroadcastTx(msgs ...sdk.Msg) (*sdk.TxResponse, error) {
 	}
 
 	// Generated Protobuf-encoded bytes.
-	txBytes, err := encCfg.TxConfig.TxEncoder()(txBuilder.GetTx())
+	txBytes, err := clientCtx.TxConfig.TxEncoder()(txBuilder.GetTx())
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode tx: %w", err)
 	}

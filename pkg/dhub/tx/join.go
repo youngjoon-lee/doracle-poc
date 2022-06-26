@@ -1,10 +1,11 @@
 package tx
 
 import (
-	"encoding/hex"
 	"fmt"
+	"strconv"
 
 	secp256k1 "github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	log "github.com/sirupsen/logrus"
 	oracletypes "github.com/youngjoon-lee/dhub/x/oracle/types"
 )
@@ -16,20 +17,34 @@ func (e Executor) Join(operatorAddress string, enclaveReport []byte, encPubKey *
 	if err != nil {
 		return 0, fmt.Errorf("failed to sign and broadcast tx: %w", err)
 	}
-	log.Debugf("tx res: code:%v", res.Code)
+	log.Debugf("tx res:%v", res)
 	if res.Code != 0 {
 		return 0, fmt.Errorf("tx failed: code:%v", res.Code)
 	}
 
-	dataBytes, err := hex.DecodeString(res.Data)
+	id, err := getJoinID(res)
 	if err != nil {
-		return 0, fmt.Errorf("failed to decode tx response data: %w", err)
+		return 0, fmt.Errorf("failed to get joinID: %w", err)
+	}
+	log.Debugf("joinID:%v", id)
+
+	return id, nil
+}
+
+func getJoinID(res *sdk.TxResponse) (uint64, error) {
+	for _, event := range res.Events {
+		if event.Type == oracletypes.EventTypeJoin {
+			for _, attr := range event.Attributes {
+				if string(attr.Key) == oracletypes.AttributeKeyID {
+					id, err := strconv.ParseUint(string(attr.Value), 10, 64)
+					if err != nil {
+						return 0, fmt.Errorf("failed to parse id: %w", err)
+					}
+					return id, nil
+				}
+			}
+		}
 	}
 
-	var response oracletypes.MsgJoinResponse
-	if err := e.Context().Codec.Unmarshal(dataBytes, &response); err != nil {
-		return 0, fmt.Errorf("failed to unmarshal tx response data: %w", err)
-	}
-
-	return response.ID, nil
+	return 0, fmt.Errorf("joinID not found from events")
 }
