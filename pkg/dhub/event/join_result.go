@@ -19,8 +19,8 @@ type JoinResultEvent struct {
 
 func NewJoinResultEvent(joinID uint64, encPrivKey *btcec.PrivateKey, oracleKeyFilePath string) JoinResultEvent {
 	return JoinResultEvent{
-		joinID: joinID,
-		encPrivKey: encPrivKey,
+		joinID:            joinID,
+		encPrivKey:        encPrivKey,
 		oracleKeyFilePath: oracleKeyFilePath,
 	}
 }
@@ -30,10 +30,7 @@ func (e JoinResultEvent) Name() string {
 }
 
 func (e JoinResultEvent) Query() string {
-	return fmt.Sprintf(
-		"message.module='oracle' AND join_result.id='%v'",
-		e.joinID,
-	)
+	return fmt.Sprintf("join_result.id='%v'", e.joinID)
 }
 
 func (e JoinResultEvent) Handler(event ctypes.ResultEvent) error {
