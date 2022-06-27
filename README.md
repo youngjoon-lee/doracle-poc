@@ -84,12 +84,58 @@ unset SGX_AESM_ADDR
 
 Run the binary using `ego` so that it can be run in the secure enclave.
 ```bash
-# For the first oracle that generates an oracle key,
-AZDCAP_DEBUG_LOG_LEVEL=INFO ego run doracle-poc -init
+export AZDCAP_DEBUG_LOG_LEVEL=INFO
+
+# For the first oracle that should generate an oracle key,
+ego run doracle-poc \
+	-tm-rpc tcp://<tendermint-rpc-ip>:<port> \
+	-chain-id dhub-1 \
+	-operator "fossil mimic ... river" \
+	-init
 
 # For an oracle that joins to the existing oracle group,
-AZDCAP_DEBUG_LOG_LEVEL=INFO ego run doracle-poc -peer http://<ip>:<port>
+ego run doracle-poc \
+	-tm-rpc tcp://<tendermint-rpc-ip>:<port> \
+	-chain-id dhub-1 \
+	-operator "fossil mimic ... river" \
+	-join
 
 # For restarting the oracle that already has the oracle key,
-AZDCAP_DEBUG_LOG_LEVEL=INFO ego run doracle-poc
+ego run doracle-poc \
+	-tm-rpc tcp://<tendermint-rpc-ip>:<port> \
+	-chain-id dhub-1 \
+	-operator "fossil mimic ... river"
 ```
+
+
+## Architecture
+
+### Oracle Joining Process
+
+![](./doc/images/join.png)
+
+First of all, we should assume that the 1st oracle exists and is innocent (the genuine binary is running in the SGX).
+
+By validating the SGX report of the new node, we can ensure that the new node is running the genuine binary in the SGX.
+The signer ID, product ID, security version, and report data must be validated.
+
+
+### Data Validation Process
+
+![](./doc/images//selldata.png)
+
+A key point is that data sellers must encrypt their data using the oracle public key
+which was generated in the SGX, so that oracle node operators cannot see the decrypted data contents.
+
+A pitfall here is that there is yet no fancy way to deliver the data to the data buyer.
+If we let the data seller to send the data to the buyer directly after oracles complete the data validation, there is a risk that the data seller can send a fake data that is
+not equal to the data submitted to oracles.
+Thus, we need to rely on oracles to upload re-encrypted data using the buyer's public key
+to the storage, so that the buyer can download it.
+Of course, the re-encryption must be done in the SGX.
+A downside is that all oracles upload the same data to the storage. This downside can be mitigated if we use a storage like IPFS which doesn't store duplicated data pieces.
+
+
+## TODOs
+
+- 
