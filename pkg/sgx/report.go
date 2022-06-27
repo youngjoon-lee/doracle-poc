@@ -18,7 +18,7 @@ func GenerateRemotePeport(data []byte) ([]byte, error) {
 const (
 	promisedMinSecurityVersion = 1
 	promisedProductID          = 1
-	promisedSignerID           = "be9577a203acebd6957b180cc6ccd4a1a66d03e81657d7e7584ef469de5b9b99"
+	promisedSignerID           = "5e54e2a96066cf6a20b59e4f0b10cd3f3ecad2dd598c5623a0802821d043dc42"
 )
 
 // VerifyRemoteReport verifies whether the report not only was properly generated in the SGX environment,
