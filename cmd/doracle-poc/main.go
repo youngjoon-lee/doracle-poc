@@ -35,7 +35,7 @@ func main() {
 	if *pInit && *pJoin {
 		log.Fatal("do not use -init with -join")
 	} else if *pInit {
-		if err := mode.Init(); err != nil {
+		if err := mode.Init(app); err != nil {
 			log.Fatalf("failed to run the init mode: %v", err)
 		}
 	} else if *pJoin {

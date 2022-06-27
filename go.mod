@@ -8,7 +8,7 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/tendermint/tendermint v0.34.19
-	github.com/youngjoon-lee/dhub v0.0.0-20220626064246-7a261608e5d0
+	github.com/youngjoon-lee/dhub v0.0.0-20220627201905-aba6083cfa87
 )
 
 require (
