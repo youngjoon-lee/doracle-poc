@@ -3,6 +3,23 @@
 This is a proof-of-concept of the decentralized oracle which validates off-chain data while preserving privacy powered by on-chain proof-of-stake and Intel SGX.
 
 
+## Problem Statements
+
+### Needs of data validation
+
+- To make the data sales process secure and atomic, data being sold must be validated.
+	- For example, it should be validated that data is in the format desired by the buyer.
+- It is not a good idea to let blockchains validate data, because blockchains are not suitable for handling large data. Also, it is not recommended to put sensitive data to the blockchain even if it is encrypted due to potential security risks.
+- For these reasons, it is necessary to have an off-chain data validator.
+
+### Challenges & Solutions
+
+- There can be a number of Byzantine data validators.
+	- Solution: Proof-of-stake powered by the blockchain
+- The operator (human) of data validators can see the contents of sensitive data.
+	- Solution: Secure enclave powered by Intel SGX
+
+
 ## Hardware Requirements
 
 The oracle only works on [SGX](https://www.intel.com/content/www/us/en/developer/tools/software-guard-extensions/overview.html)-[FLC](https://github.com/intel/linux-sgx/blob/master/psw/ae/ref_le/ref_le.md) environment with a [quote provider](https://docs.edgeless.systems/ego/#/reference/attest) installed.
