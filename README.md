@@ -129,10 +129,13 @@ ego run doracle-poc \
 
 ### Oracle Joining Process
 
+In order for oracle nodes to be able to decrypt data which was encrypted by the `oracle-pubkey`, the `oracle-privkey` must be shared across all oracle nodes.
+
 ![](./doc/images/join.png)
 
 First of all, we should assume that the 1st oracle exists and is innocent (the genuine binary is running in the SGX).
 
+The `oracle-privkey` must be shared with new nodes who submit a valid SGX remote report.
 By validating the SGX report of the new node, we can ensure that the new node is running the genuine binary in the SGX.
 The signer ID, product ID, security version, and report data must be validated.
 
