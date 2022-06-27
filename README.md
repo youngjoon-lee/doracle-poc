@@ -155,4 +155,5 @@ A downside is that all oracles upload the same data to the storage. This downsid
 
 ## TODOs
 
-- 
+- Proof of stake
+- Data validation
